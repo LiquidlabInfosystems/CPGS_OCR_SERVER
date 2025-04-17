@@ -1,8 +1,12 @@
 import base64
 import os
 import tempfile
+from bson import ObjectId
 from django.http import HttpResponse
 from django.views.decorators.csrf import csrf_exempt
+from django.http import JsonResponse
+# from app.models import Spaces
+from mongoClient import get_mongo_client
 from paddleocr import PaddleOCR
 import json
 
@@ -16,17 +20,11 @@ def get_ocr(req):
         return HttpResponse("Method not allowed", status=405)
 
     try:
-        # Assume base64 string is sent in JSON body or form data
-        if req.content_type == 'application/json':
-            data = json.loads(req.body)
-            if 'frame' not in data:
-                return HttpResponse("No frame provided", status=400)
-            base64_string = data['frame']
-        else:
-            # Fallback to form data
-            base64_string = req.POST.get('frame')
-            if not base64_string:
-                return HttpResponse("No frame provided", status=400)
+       
+        base64_string = req.POST.get('frame')
+        document_id = req.POST.get('document_id')
+        if  base64_string is None or  document_id is None:
+            return HttpResponse("Required frame and document_id", status=400)
 
         # Remove 'data:image/jpeg;base64,' prefix if present
         if ';base64,' in base64_string:
@@ -48,7 +46,14 @@ def get_ocr(req):
                 ocr_output = result[0][0][1][0] if result[0][0][1] else "No text detected"
             else:
                 ocr_output = "No text detected"
-            return HttpResponse(ocr_output)
+                
+            # update database
+            db = get_mongo_client()
+            collection = db['spaces']
+            result = collection.update_one( {"_id": ObjectId(document_id)}, {"$set": {"licenseNumber": ocr_output}})
+            if result:
+                return JsonResponse({'status':'ok'})
+            return JsonResponse({'status':'Error At Ocr server'})
 
         finally:
             # Clean up temporary file
