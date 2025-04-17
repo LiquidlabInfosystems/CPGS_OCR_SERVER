@@ -5,5 +5,5 @@ from app import views
 
 urlpatterns = [
     # path('admin/', views.server_status, name='server_status'),
-    path('getocr/', views.get_ocr, name='getocr'),
+    path('', views.get_ocr, name='getocr'),
 ]
